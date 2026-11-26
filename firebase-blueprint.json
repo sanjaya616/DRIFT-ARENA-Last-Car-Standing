@@ -1,0 +1,177 @@
+{
+  "entities": {
+    "PrivateUserInfo": {
+      "title": "PrivateUserInfo",
+      "description": "Private authenticated user identity details isolated from public collections.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "createdAt", "updatedAt"]
+    },
+    "LeaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Public racer career stats and best arena score for the Drift Arena leaderboard.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9 _\\-.]+$"
+        },
+        "favoriteVehicle": {
+          "type": "string",
+          "enum": ["street_rs", "drift_x", "muscle_gt", "speedster", "rally_beast", "titan_4x"],
+          "maxLength": 32
+        },
+        "wins": {
+          "type": "number"
+        },
+        "matchesPlayed": {
+          "type": "number"
+        },
+        "eliminations": {
+          "type": "number"
+        },
+        "bestScore": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "favoriteVehicle",
+        "wins",
+        "matchesPlayed",
+        "eliminations",
+        "bestScore",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MatchHistoryRecord": {
+      "title": "MatchHistoryRecord",
+      "description": "Immutable summary of a completed Drift Arena match for a player.",
+      "type": "object",
+      "properties": {
+        "matchId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "roomCode": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 16,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["online_public", "online_private", "survival", "freedrive"],
+          "maxLength": 24
+        },
+        "vehicleId": {
+          "type": "string",
+          "enum": ["street_rs", "drift_x", "muscle_gt", "speedster", "rally_beast", "titan_4x"],
+          "maxLength": 32
+        },
+        "placement": {
+          "type": "number"
+        },
+        "playersCount": {
+          "type": "number"
+        },
+        "eliminations": {
+          "type": "number"
+        },
+        "score": {
+          "type": "number"
+        },
+        "won": {
+          "type": "boolean"
+        },
+        "winnerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "durationSec": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "matchId",
+        "ownerId",
+        "roomCode",
+        "mode",
+        "vehicleId",
+        "placement",
+        "playersCount",
+        "eliminations",
+        "score",
+        "won",
+        "winnerName",
+        "durationSec",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/private/info": {
+      "schema": { "$ref": "#/entities/PrivateUserInfo" },
+      "description": "Owner-only PII document storing authenticated user email and account timestamps."
+    },
+    "/leaderboard/{userId}": {
+      "schema": { "$ref": "#/entities/LeaderboardEntry" },
+      "description": "Public racer profile and cumulative leaderboard stats keyed by Firebase UID."
+    },
+    "/matchHistory/{matchId}": {
+      "schema": { "$ref": "#/entities/MatchHistoryRecord" },
+      "description": "Immutable per-user match outcome history records."
+    }
+  }
+}

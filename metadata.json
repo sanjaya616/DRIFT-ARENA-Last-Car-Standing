@@ -1,0 +1,6 @@
+{
+  "name": "DRIFT ARENA – Last Car Standing",
+  "description": "Mobile-first 3D arcade car-combat survival game built with Three.js and Rapier 3D physics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

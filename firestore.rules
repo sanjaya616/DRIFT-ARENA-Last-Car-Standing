@@ -1,0 +1,208 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidVehicleId(v) {
+      return v is string && v.size() <= 32 && v in [
+        'street_rs',
+        'drift_x',
+        'muscle_gt',
+        'speedster',
+        'rally_beast',
+        'titan_4x'
+      ];
+    }
+
+    function isValidMode(m) {
+      return m is string && m.size() <= 24 && m in [
+        'online_public',
+        'online_private',
+        'survival',
+        'freedrive'
+      ];
+    }
+
+    function isValidPrivateUserInfo(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid == userId
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLeaderboardEntry(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'displayName',
+          'favoriteVehicle',
+          'wins',
+          'matchesPlayed',
+          'eliminations',
+          'bestScore',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'favoriteVehicle',
+          'wins',
+          'matchesPlayed',
+          'eliminations',
+          'bestScore',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid == userId
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 32
+        && data.displayName.matches('^[a-zA-Z0-9 _\\-.]+$')
+        && isValidVehicleId(data.favoriteVehicle)
+        && data.wins is number && data.wins >= 0 && data.wins <= 100000
+        && data.matchesPlayed is number && data.matchesPlayed >= 0 && data.matchesPlayed <= 500000
+        && data.eliminations is number && data.eliminations >= 0 && data.eliminations <= 1000000
+        && data.bestScore is number && data.bestScore >= 0 && data.bestScore <= 5000000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMatchHistoryRecord(data, matchId) {
+      return data.keys().hasAll([
+          'matchId',
+          'ownerId',
+          'roomCode',
+          'mode',
+          'vehicleId',
+          'placement',
+          'playersCount',
+          'eliminations',
+          'score',
+          'won',
+          'winnerName',
+          'durationSec',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'matchId',
+          'ownerId',
+          'roomCode',
+          'mode',
+          'vehicleId',
+          'placement',
+          'playersCount',
+          'eliminations',
+          'score',
+          'won',
+          'winnerName',
+          'durationSec',
+          'createdAt'
+        ])
+        && data.matchId is string && data.matchId.size() >= 4 && data.matchId.size() <= 128 && data.matchId == matchId
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId == request.auth.uid
+        && data.roomCode is string && data.roomCode.size() >= 2 && data.roomCode.size() <= 16 && data.roomCode.matches('^[a-zA-Z0-9_\\-]+$')
+        && isValidMode(data.mode)
+        && isValidVehicleId(data.vehicleId)
+        && data.placement is number && data.placement >= 1 && data.placement <= 8
+        && data.playersCount is number && data.playersCount >= 1 && data.playersCount <= 8
+        && data.eliminations is number && data.eliminations >= 0 && data.eliminations <= 50
+        && data.score is number && data.score >= 0 && data.score <= 500000
+        && data.won is bool
+        && data.winnerName is string && data.winnerName.size() >= 1 && data.winnerName.size() <= 32
+        && data.durationSec is number && data.durationSec >= 0 && data.durationSec <= 7200
+        && data.createdAt is timestamp;
+    }
+
+    // Owner-isolated PII
+    match /users/{userId}/private/info {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isVerifiedUser()
+        && isValidPrivateUserInfo(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isVerifiedUser()
+        && isValidPrivateUserInfo(incoming(), userId)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'updatedAt'])
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // Public Career Leaderboard
+    match /leaderboard/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if resource.data.bestScore >= 0;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isVerifiedUser()
+        && isValidLeaderboardEntry(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isVerifiedUser()
+        && isValidLeaderboardEntry(incoming(), userId)
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'favoriteVehicle',
+          'wins',
+          'matchesPlayed',
+          'eliminations',
+          'bestScore',
+          'updatedAt'
+        ])
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().wins >= existing().wins
+        && incoming().matchesPlayed >= existing().matchesPlayed
+        && incoming().eliminations >= existing().eliminations
+        && incoming().bestScore >= existing().bestScore;
+      allow delete: if false;
+    }
+
+    // Immutable Per-Player Match History
+    match /matchHistory/{matchId} {
+      allow get: if isValidId(matchId) && isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isValidId(matchId)
+        && isVerifiedUser()
+        && isValidMatchHistoryRecord(incoming(), matchId)
+        && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}
